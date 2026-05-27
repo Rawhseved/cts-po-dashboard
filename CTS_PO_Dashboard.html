@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CTS Mobility — PO Open Billing Status</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root {
+  --bg: #0f1117;
+  --surface: #161b27;
+  --surface2: #1e2535;
+  --border: #2a3349;
+  --border-light: #334060;
+  --text: #e2e8f0;
+  --text-muted: #64748b;
+  --text-dim: #94a3b8;
+
+  --amber: #f59e0b;
+  --amber-dim: #78350f;
+  --amber-bg: #1c1507;
+  --blue: #3b82f6;
+  --blue-dim: #1e3a5f;
+  --blue-bg: #050d1c;
+  --violet: #8b5cf6;
+  --violet-dim: #3b1f6b;
+  --violet-bg: #0d0818;
+  --emerald: #10b981;
+  --emerald-dim: #064e3b;
+  --emerald-bg: #021510;
+
+  --red: #ef4444;
+  --green: #22c55e;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* ── TOPBAR ─────────────────────────────────────────────────────────── */
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 28px; height: 56px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 100;
+  gap: 16px; flex-wrap: wrap;
+}
+.topbar-brand { display: flex; align-items: center; gap: 10px; }
+.topbar-logo {
+  width: 32px; height: 32px; border-radius: 8px;
+  background: linear-gradient(135deg, #1d4ed8, #7c3aed);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 13px; color: white; letter-spacing: -0.5px;
+  font-family: 'IBM Plex Mono', monospace;
+}
+.topbar-title { font-weight: 700; font-size: 15px; letter-spacing: -0.3px; }
+.topbar-sub { font-size: 11px; color: var(--text-muted); font-family: 'IBM Plex Mono', monospace; margin-top: 1px; }
+.topbar-right { display: flex; align-items: center; gap: 8px; }
+
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 14px; border-radius: 6px; border: 1px solid var(--border-light);
+  background: var(--surface2); color: var(--text-dim); font-size: 12px;
+  font-weight: 500; cursor: pointer; font-family: inherit;
+  transition: all .15s; white-space: nowrap;
+}
+.btn:hover { border-color: var(--blue); color: var(--text); background: var(--blue-dim); }
+.btn-primary { background: var(--blue); border-color: var(--blue); color: white; }
+.btn-primary:hover { background: #2563eb; border-color: #2563eb; }
+.btn-green { background: #064e3b; border-color: var(--emerald); color: var(--emerald); }
+.btn-green:hover { background: #065f46; }
+.btn.active { border-color: var(--red); background: #300; color: var(--red); }
+
+/* ── PAGE ───────────────────────────────────────────────────────────── */
+.page { max-width: 1400px; margin: 0 auto; padding: 24px 28px; }
+
+/* ── KPI TILES ──────────────────────────────────────────────────────── */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px; margin-bottom: 20px;
+}
+@media(max-width: 900px){ .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+@media(max-width: 500px){ .kpi-grid { grid-template-columns: 1fr; } }
+
+.kpi-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 18px 20px;
+  cursor: pointer; transition: all .15s; position: relative; overflow: hidden;
+  user-select: none;
+}
+.kpi-card::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0;
+  width: 3px; border-radius: 3px 0 0 3px;
+  background: var(--card-accent);
+}
+.kpi-card:hover { border-color: var(--card-accent); transform: translateY(-1px); box-shadow: 0 4px 20px rgba(0,0,0,.3); }
+.kpi-card.active { border-color: var(--card-accent); background: var(--card-bg); box-shadow: 0 0 0 1px var(--card-accent); }
+.kpi-card.active .kpi-check { opacity: 1; }
+
+.kpi-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.kpi-icon { font-size: 18px; }
+.kpi-check { font-size: 12px; color: var(--card-accent); opacity: 0; transition: opacity .15s; font-weight: 700; }
+.kpi-count { font-size: 32px; font-weight: 700; line-height: 1; color: white; letter-spacing: -1px; font-family: 'IBM Plex Mono', monospace; }
+.kpi-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); margin-top: 4px; }
+.kpi-amount { font-size: 13px; color: var(--card-accent); font-family: 'IBM Plex Mono', monospace; margin-top: 6px; font-weight: 600; }
+
+.kpi-card[data-key="pendingBilling"]      { --card-accent: var(--amber);   --card-bg: var(--amber-bg); }
+.kpi-card[data-key="pendingReceipt"]      { --card-accent: var(--blue);    --card-bg: var(--blue-bg); }
+.kpi-card[data-key="pendingBillPartReceived"] { --card-accent: var(--violet);  --card-bg: var(--violet-bg); }
+.kpi-card[data-key="partiallyReceived"]   { --card-accent: var(--emerald); --card-bg: var(--emerald-bg); }
+
+/* ── SUMMARY BANNER ─────────────────────────────────────────────────── */
+.summary-bar {
+  display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 14px 20px; margin-bottom: 20px;
+}
+.summary-stat { display: flex; flex-direction: column; }
+.summary-stat-val { font-size: 18px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; color: white; }
+.summary-stat-lbl { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; margin-top: 1px; }
+.summary-divider { width: 1px; height: 32px; background: var(--border); }
+
+/* ── TOOLBAR ────────────────────────────────────────────────────────── */
+.toolbar {
+  display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+  margin-bottom: 16px;
+}
+.search-wrap { flex: 1; min-width: 220px; position: relative; }
+.search-wrap input {
+  width: 100%; padding: 9px 14px 9px 38px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 7px; color: var(--text); font-size: 13px;
+  font-family: inherit; outline: none; transition: border .15s;
+}
+.search-wrap input:focus { border-color: var(--blue); }
+.search-wrap input::placeholder { color: var(--text-muted); }
+.search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 14px; pointer-events: none; }
+
+.filter-pill {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 12px; border-radius: 7px;
+  font-size: 12px; color: var(--text-muted);
+  background: var(--surface); border: 1px solid var(--border);
+  font-size: 12px; font-weight: 500;
+}
+.filter-pill.active-filter { border-color: var(--red); color: var(--red); background: #1a0505; }
+.filter-pill .x { cursor: pointer; opacity: .6; }
+.filter-pill .x:hover { opacity: 1; }
+
+/* ── TABLE SECTION ──────────────────────────────────────────────────── */
+.section {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; margin-bottom: 16px; overflow: hidden;
+  display: none;
+}
+.section.visible { display: block; }
+
+.section-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 13px 18px; cursor: pointer; user-select: none;
+  border-bottom: 1px solid var(--border); flex-wrap: wrap; gap: 8px;
+  transition: background .12s;
+}
+.section-head:hover { background: var(--surface2); }
+.section-head-left { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.section-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 10px; border-radius: 20px;
+  font-size: 11px; font-weight: 700; font-family: 'IBM Plex Mono', monospace;
+}
+.section-total { font-size: 12px; font-family: 'IBM Plex Mono', monospace; font-weight: 600; }
+.section-label { font-size: 14px; font-weight: 600; }
+.section-chevron { font-size: 11px; color: var(--text-muted); transition: transform .2s; }
+.section-chevron.closed { transform: rotate(-90deg); }
+
+.section[data-key="pendingBilling"]           .section-badge { background: var(--amber-dim); color: var(--amber); }
+.section[data-key="pendingReceipt"]           .section-badge { background: var(--blue-dim); color: var(--blue); }
+.section[data-key="pendingBillPartReceived"]  .section-badge { background: var(--violet-dim); color: var(--violet); }
+.section[data-key="partiallyReceived"]        .section-badge { background: var(--emerald-dim); color: var(--emerald); }
+
+.section[data-key="pendingBilling"]           .section-label { color: var(--amber); }
+.section[data-key="pendingReceipt"]           .section-label { color: var(--blue); }
+.section[data-key="pendingBillPartReceived"]  .section-label { color: var(--violet); }
+.section[data-key="partiallyReceived"]        .section-label { color: var(--emerald); }
+
+.section[data-key="pendingBilling"]           .section-total { color: var(--amber); }
+.section[data-key="pendingReceipt"]           .section-total { color: var(--blue); }
+.section[data-key="pendingBillPartReceived"]  .section-total { color: var(--violet); }
+.section[data-key="partiallyReceived"]        .section-total { color: var(--emerald); }
+
+.table-wrap { overflow-x: auto; }
+.table-wrap.hidden { display: none; }
+
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+thead th {
+  padding: 10px 16px; text-align: left;
+  font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .07em;
+  color: var(--text-muted); background: var(--surface2);
+  border-bottom: 1px solid var(--border); white-space: nowrap;
+  cursor: pointer; user-select: none;
+}
+thead th:hover { color: var(--text); }
+thead th.sorted-asc::after { content: ' ↑'; color: var(--blue); }
+thead th.sorted-desc::after { content: ' ↓'; color: var(--blue); }
+thead th.right { text-align: right; }
+
+tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
+tbody tr:last-child { border-bottom: none; }
+tbody tr:hover { background: var(--surface2); }
+
+td { padding: 10px 16px; vertical-align: middle; }
+
+.td-po a {
+  font-family: 'IBM Plex Mono', monospace; font-size: 12px; font-weight: 600;
+  color: var(--blue); text-decoration: none;
+  transition: color .12s; white-space: nowrap;
+}
+.td-po a:hover { color: #93c5fd; text-decoration: underline; }
+.td-date { color: var(--text-dim); font-size: 12px; white-space: nowrap; font-family: 'IBM Plex Mono', monospace; }
+.td-due  { white-space: nowrap; font-size: 12px; font-family: 'IBM Plex Mono', monospace; }
+.td-due.empty { color: var(--text-muted); }
+.td-due.overdue { color: var(--red); font-weight: 600; }
+.td-amount { text-align: right; white-space: nowrap; font-family: 'IBM Plex Mono', monospace; font-size: 12px; }
+.td-amount.zero { color: var(--text-muted); }
+.td-amount.nonzero { color: var(--text); font-weight: 600; }
+.td-tracking { color: var(--text-muted); max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+.empty-row td { text-align: center; padding: 28px; color: var(--text-muted); font-style: italic; }
+
+/* Table footer total row */
+.tfoot-row td { background: var(--surface2); font-weight: 700; font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--text-dim); border-top: 1px solid var(--border-light); }
+.tfoot-row .tfoot-total { color: var(--text); }
+
+/* ── FOOTER ─────────────────────────────────────────────────────────── */
+.page-footer { text-align: center; font-size: 11px; color: var(--text-muted); margin-top: 24px; font-family: 'IBM Plex Mono', monospace; }
+
+/* ── SCROLLBAR ──────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--surface); }
+::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #4a5568; }
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="topbar-brand">
+    <div class="topbar-logo">CTS</div>
+    <div>
+      <div class="topbar-title">Purchase Orders — Open Billing</div>
+      <div class="topbar-sub">Saved Search #5528 · As of May 27, 2026</div>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <button class="btn btn-green" onclick="exportExcel()" id="export-btn">
+      <span>⬇</span> Export Excel
+    </button>
+    <button class="btn active" id="btn-zero" onclick="toggleZero()">
+      <span>⊘</span> <span id="btn-zero-label">Zero Amounts</span>
+      <span id="btn-zero-count" style="background:#300;border-radius:10px;padding:1px 7px;font-size:10px;font-weight:700;"></span>
+    </button>
+    <button class="btn" id="btn-clear" onclick="clearAll()" style="display:none">
+      ✕ Clear Filters
+    </button>
+  </div>
+</div>
+
+<div class="page">
+
+  <!-- KPI TILES -->
+  <div class="kpi-grid" id="kpi-grid"></div>
+
+  <!-- SUMMARY BAR -->
+  <div class="summary-bar" id="summary-bar"></div>
+
+  <!-- TOOLBAR -->
+  <div class="toolbar">
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="search" placeholder="Search PO number, date, tracking info…" oninput="applyFilters()">
+    </div>
+    <div class="filter-pill" id="filter-info" style="display:none">
+      <span id="filter-info-text"></span>
+      <span class="x" onclick="clearAll()">✕</span>
+    </div>
+  </div>
+
+  <!-- SECTIONS -->
+  <div id="sections"></div>
+
+  <div class="page-footer" id="page-footer"></div>
+</div>
+
+<script>
+// ── DATA ─────────────────────────────────────────────────────────────────────
+const DATA = {"pendingBilling":[{"po":"PO205190","date":"5/27/2026","dueDate":"5/26/2026","amount":".00","trackingInfo":"At Warehouse","id":684167},{"po":"PO205191","date":"5/27/2026","dueDate":"","amount":".00","trackingInfo":"","id":684169},{"po":"PO205176","date":"5/21/2026","dueDate":"5/26/2026","amount":"188.63","trackingInfo":"Delivered #9212290411378900092764 invoice attached","id":679542},{"po":"PO205179","date":"5/21/2026","dueDate":"5/28/2026","amount":"415.12","trackingInfo":"USPS Tracking #9339589739064344857901","id":679677},{"po":"PO205165","date":"5/20/2026","dueDate":"5/26/2026","amount":"7290.00","trackingInfo":"Delivered #1ZB8B8340306103312 -invoice attached/Device info attached","id":678039},{"po":"PO205151","date":"5/19/2026","dueDate":"","amount":"50.00","trackingInfo":"","id":676578},{"po":"PO205155","date":"5/19/2026","dueDate":"5/19/2026","amount":".00","trackingInfo":"FedEx - 871949977348","id":677145},{"po":"PO205157","date":"5/19/2026","dueDate":"5/19/2026","amount":".00","trackingInfo":"FedEx - 01173270409","id":677205},{"po":"PO205159","date":"5/19/2026","dueDate":"","amount":".00","trackingInfo":"","id":677794},{"po":"PO205160","date":"5/19/2026","dueDate":"5/26/2026","amount":"60860.00","trackingInfo":"Delivered UPS Tracking # 1ZB8B8340306100057 (Qty 7 of MDH74LL/A)","id":677797},{"po":"PO205163","date":"5/19/2026","dueDate":"","amount":"1500.00","trackingInfo":"Field Survey Already Completed","id":677813},{"po":"PO205164","date":"5/19/2026","dueDate":"","amount":"1500.00","trackingInfo":"Field Survey Already Completed","id":677814},{"po":"PO205139","date":"5/18/2026","dueDate":"5/20/2026","amount":"53.98","trackingInfo":"USPS - 9361289739064200456215","id":674920},{"po":"PO205142","date":"5/18/2026","dueDate":"","amount":".00","trackingInfo":"","id":675817},{"po":"PO205145","date":"5/18/2026","dueDate":"","amount":".00","trackingInfo":"COI PO","id":676109},{"po":"PO205147","date":"5/18/2026","dueDate":"","amount":".00","trackingInfo":"COI PO","id":676139},{"po":"PO205148","date":"5/18/2026","dueDate":"5/26/2026","amount":"961.29","trackingInfo":"Enrolment Pending Awaiting confirmation from Vendor.","id":676144},{"po":"PO205150","date":"5/18/2026","dueDate":"5/26/2026","amount":"944.90","trackingInfo":"FedEx - 872026333814 Delivered","id":676261},{"po":"PO205132","date":"5/15/2026","dueDate":"5/15/2026","amount":"408.00","trackingInfo":"Delivered in Warehouse","id":674491},{"po":"PO205134","date":"5/15/2026","dueDate":"","amount":".00","trackingInfo":"COI PO","id":674511},{"po":"PO205135","date":"5/15/2026","dueDate":"","amount":".00","trackingInfo":"COI PO","id":674512},{"po":"PO205122","date":"5/14/2026","dueDate":"5/20/2026","amount":"241.99","trackingInfo":"Delivered #523691589508","id":673214},{"po":"PO205123","date":"5/14/2026","dueDate":"5/18/2026","amount":".00","trackingInfo":"ETA Trk#525724126691 Invoice attached","id":673239},{"po":"PO205127","date":"5/14/2026","dueDate":"5/26/2026","amount":"8.00","trackingInfo":"Delivered UPS tracking #1ZR1G7094226275159","id":673423},{"po":"PO205104","date":"5/13/2026","dueDate":"5/19/2026","amount":"362.50","trackingInfo":"ETA","id":671181},{"po":"PO205088","date":"5/12/2026","dueDate":"","amount":".00","trackingInfo":"","id":669135},{"po":"PO205089","date":"5/12/2026","dueDate":"","amount":".00","trackingInfo":"COI PO","id":669288},{"po":"PO205097","date":"5/12/2026","dueDate":"5/14/2026","amount":"308.94","trackingInfo":"ETA","id":670229},{"po":"PO205098","date":"5/12/2026","dueDate":"5/19/2026","amount":"2699.90","trackingInfo":"ESTES Tracking #0842550318","id":670232},{"po":"PO205099","date":"5/12/2026","dueDate":"","amount":".00","trackingInfo":"","id":670245},{"po":"PO205100","date":"5/12/2026","dueDate":"5/15/2026","amount":"179.95","trackingInfo":"ETA","id":670367},{"po":"PO205101","date":"5/12/2026","dueDate":"","amount":"338.90","trackingInfo":"ESD","id":670635},{"po":"PO205079","date":"5/11/2026","dueDate":"","amount":".00","trackingInfo":"","id":667937},{"po":"PO205084","date":"5/11/2026","dueDate":"","amount":".00","trackingInfo":"","id":668970},{"po":"PO205086","date":"5/11/2026","dueDate":"5/13/2026","amount":"1294.92","trackingInfo":"UPS Overnight - 1ZW864440130171138","id":668999},{"po":"PO205063","date":"5/8/2026","dueDate":"","amount":".00","trackingInfo":"COI PO","id":666888},{"po":"PO205070","date":"5/8/2026","dueDate":"5/11/2026","amount":"91.90","trackingInfo":"USPS - 9361289739063912134824","id":667659},{"po":"PO205074","date":"5/8/2026","dueDate":"5/13/2026","amount":"4672.50","trackingInfo":"Delivered 1ZA881R20391910145 invoice attached/device info attached","id":667696},{"po":"PO205044","date":"5/6/2026","dueDate":"","amount":".00","trackingInfo":"COI PO for receiving","id":664082},{"po":"PO205047","date":"5/6/2026","dueDate":"","amount":".00","trackingInfo":"","id":664408},{"po":"PO205049","date":"5/6/2026","dueDate":"","amount":".00","trackingInfo":"","id":664517},{"po":"PO205050","date":"5/6/2026","dueDate":"","amount":".00","trackingInfo":"","id":664531},{"po":"PO205051","date":"5/6/2026","dueDate":"","amount":".00","trackingInfo":"","id":664538},{"po":"PO205040","date":"5/5/2026","dueDate":"5/12/2026","amount":"1266.00","trackingInfo":"Fedex tracking #871525259801","id":662930},{"po":"PO205041","date":"5/5/2026","dueDate":"","amount":"85.62","trackingInfo":"Awaiting tracking (Following up with vendor for status)","id":663061},{"po":"PO205033","date":"5/4/2026","dueDate":"5/7/2026","amount":"402.42","trackingInfo":"FedEx #511765503294","id":661371},{"po":"PO205024","date":"5/1/2026","dueDate":"","amount":".00","trackingInfo":"Warehouse team requested to create PO for receiving V810A.","id":658946},{"po":"PO205025","date":"5/1/2026","dueDate":"","amount":".00","trackingInfo":"COI-PO requested by WH for Enbridge [SO169916]","id":658962},{"po":"PO205017","date":"4/30/2026","dueDate":"","amount":"1300.00","trackingInfo":"ETA #1ZJ456360411728465","id":656631},{"po":"PO205019","date":"4/30/2026","dueDate":"","amount":".00","trackingInfo":"","id":657367},{"po":"PO205021","date":"4/30/2026","dueDate":"","amount":".00","trackingInfo":"COI PO","id":658035},{"po":"PO205009","date":"4/29/2026","dueDate":"5/18/2026","amount":"980.00","trackingInfo":"ETA 1ZJ456360409261302","id":655268},{"po":"PO204999","date":"4/28/2026","dueDate":"4/27/2026","amount":".00","trackingInfo":"","id":652683},{"po":"PO204974","date":"4/23/2026","dueDate":"","amount":"2500.00","trackingInfo":"1ZW821F30344656487","id":647560},{"po":"PO204980","date":"4/23/2026","dueDate":"5/18/2026","amount":"13994.40","trackingInfo":"ETA 1ZJ456360409261302","id":647987},{"po":"PO204968","date":"4/22/2026","dueDate":"","amount":".00","trackingInfo":"","id":647039},{"po":"PO204960","date":"4/21/2026","dueDate":"","amount":".00","trackingInfo":"COI PO","id":645379},{"po":"PO204949","date":"4/20/2026","dueDate":"4/27/2026","amount":"175.00","trackingInfo":"FedEx #870897303559","id":643459},{"po":"PO204944","date":"4/17/2026","dueDate":"","amount":".00","trackingInfo":"Completed 5/1/2026/invoice attached","id":643002},{"po":"PO204935","date":"4/16/2026","dueDate":"","amount":"9270.00","trackingInfo":"Lead time 5-7 weeks","id":641709},{"po":"PO204916","date":"4/15/2026","dueDate":"","amount":".00","trackingInfo":"","id":640024},{"po":"PO204910","date":"4/14/2026","dueDate":"","amount":".00","trackingInfo":"COI PO","id":638915},{"po":"PO204894","date":"4/13/2026","dueDate":"","amount":"3150.00","trackingInfo":"United cargo tracking #016-20296220","id":636773},{"po":"PO204886","date":"4/9/2026","dueDate":"","amount":".00","trackingInfo":"COI PO","id":634787},{"po":"PO204873","date":"4/7/2026","dueDate":"5/6/2026","amount":"10615.00","trackingInfo":"ETA Pending UPS: 1Z71630W0398231225","id":632029},{"po":"PO204862","date":"4/6/2026","dueDate":"4/13/2026","amount":"102200.00","trackingInfo":"MAERSK Tracking # 387011630 (qty-93 of 100)","id":630570},{"po":"PO204867","date":"4/6/2026","dueDate":"","amount":".00","trackingInfo":"COI PO","id":630720},{"po":"PO204858","date":"4/3/2026","dueDate":"4/13/2026","amount":".00","trackingInfo":"USPS 9418450106151000527616","id":629277},{"po":"PO204857","date":"4/2/2026","dueDate":"","amount":"606.09","trackingInfo":"Geolocation restriction - Ramp card 2412","id":628205},{"po":"PO204852","date":"4/1/2026","dueDate":"","amount":".00","trackingInfo":"Requested by Orders team for SO185179 [COI-PO]","id":626911},{"po":"PO204828","date":"3/30/2026","dueDate":"","amount":".00","trackingInfo":"COI PO","id":622429},{"po":"PO204837","date":"3/30/2026","dueDate":"3/30/2026","amount":".00","trackingInfo":"Sims are already in warehouse.","id":624127},{"po":"PO204814","date":"3/27/2026","dueDate":"","amount":".00","trackingInfo":"COI PO","id":621529},{"po":"PO204815","date":"3/27/2026","dueDate":"","amount":".00","trackingInfo":"","id":621532},{"po":"PO204821","date":"3/27/2026","dueDate":"4/29/2026","amount":"167910.00","trackingInfo":"Qty 74 FedEx #511765499302 / Qty 425 FedEx #302672871766","id":621711},{"po":"PO204825","date":"3/27/2026","dueDate":"4/1/2026","amount":"20.00","trackingInfo":"Fedex tracking #870132806073","id":621980},{"po":"PO204827","date":"3/27/2026","dueDate":"","amount":"810.00","trackingInfo":"UPS tracking #1ZB87Y280410666681","id":622087},{"po":"PO204798","date":"3/25/2026","dueDate":"","amount":".00","trackingInfo":"","id":620731},{"po":"PO204788","date":"3/24/2026","dueDate":"","amount":".00","trackingInfo":"COI PO","id":619710},{"po":"PO204792","date":"3/24/2026","dueDate":"","amount":".00","trackingInfo":"COI PO","id":619775},{"po":"PO204785","date":"3/23/2026","dueDate":"","amount":".00","trackingInfo":"COI PO for Forvis Mazars","id":619301},{"po":"PO204772","date":"3/20/2026","dueDate":"","amount":".00","trackingInfo":"COPO","id":617734},{"po":"PO204768","date":"3/19/2026","dueDate":"","amount":"775.00","trackingInfo":"UPS tracking #1Z216A050438277275","id":616951},{"po":"PO204769","date":"3/19/2026","dueDate":"","amount":".00","trackingInfo":"COPO","id":616964},{"po":"PO204730","date":"3/16/2026","dueDate":"","amount":".00","trackingInfo":"","id":613961},{"po":"PO204734","date":"3/16/2026","dueDate":"","amount":".00","trackingInfo":"","id":614128},{"po":"PO204735","date":"3/16/2026","dueDate":"3/31/2026","amount":"3080.00","trackingInfo":"UPS tracking #1ZJ456360400663831","id":614149},{"po":"PO204739","date":"3/16/2026","dueDate":"","amount":".00","trackingInfo":"","id":614508},{"po":"PO204744","date":"3/16/2026","dueDate":"4/1/2026","amount":"757.80","trackingInfo":"UPS Tracking #1Z3E392F0394681226","id":614769},{"po":"PO204716","date":"3/12/2026","dueDate":"","amount":".00","trackingInfo":"","id":611992},{"po":"PO204718","date":"3/12/2026","dueDate":"4/7/2026","amount":"10400.00","trackingInfo":"DHL Tracking # 1683123831 (Qty-400 of Zen-LN-SurfaceGo3/4)","id":612305},{"po":"PO204719","date":"3/12/2026","dueDate":"","amount":".00","trackingInfo":"","id":612332},{"po":"PO204721","date":"3/12/2026","dueDate":"","amount":".00","trackingInfo":"","id":612505},{"po":"PO204697","date":"3/10/2026","dueDate":"","amount":"85.57","trackingInfo":"ESD","id":610646},{"po":"PO204660","date":"3/5/2026","dueDate":"","amount":".00","trackingInfo":"","id":607876},{"po":"PO204661","date":"3/5/2026","dueDate":"","amount":".00","trackingInfo":"CO PO","id":608004},{"po":"PO204609","date":"2/26/2026","dueDate":"","amount":"1300.00","trackingInfo":"Delivered Fedex #8889 5710 2890","id":601762},{"po":"PO204616","date":"2/26/2026","dueDate":"","amount":".00","trackingInfo":"","id":602992},{"po":"PO204595","date":"2/25/2026","dueDate":"","amount":".00","trackingInfo":"","id":600385},{"po":"PO204600","date":"2/25/2026","dueDate":"","amount":".00","trackingInfo":"COI PO","id":601138},{"po":"PO204582","date":"2/23/2026","dueDate":"","amount":"391.72","trackingInfo":"Receiving PO","id":598870},{"po":"PO204567","date":"2/19/2026","dueDate":"","amount":".00","trackingInfo":"","id":596809},{"po":"PO204557","date":"2/18/2026","dueDate":"","amount":".00","trackingInfo":"CO PO","id":595700},{"po":"PO204559","date":"2/18/2026","dueDate":"4/15/2026","amount":"2450.00","trackingInfo":"DHL tracking #3327610296 (156 qty received of 250)","id":596094},{"po":"PO204543","date":"2/13/2026","dueDate":"","amount":".00","trackingInfo":"","id":593524},{"po":"PO204544","date":"2/13/2026","dueDate":"","amount":".00","trackingInfo":"Requested by Orders team for Master SO183045","id":593606},{"po":"PO204537","date":"2/12/2026","dueDate":"","amount":".00","trackingInfo":"Requested by Orders team for SO182984","id":592838},{"po":"PO204540","date":"2/12/2026","dueDate":"2/12/2026","amount":".00","trackingInfo":"Received By Cody","id":593157},{"po":"PO204541","date":"2/12/2026","dueDate":"","amount":".00","trackingInfo":"","id":593158},{"po":"PO204531","date":"2/11/2026","dueDate":"2/11/2026","amount":"184.68","trackingInfo":"Delivered #1ZR1G7094207640405","id":592375},{"po":"PO204521","date":"2/10/2026","dueDate":"2/12/2026","amount":"345.00","trackingInfo":"UPS: 1Z1A57R50150903704 - Delivered to wrong location, replacement shipped","id":591143},{"po":"PO204495","date":"2/5/2026","dueDate":"","amount":".00","trackingInfo":"Requested by Orders team for SO182773","id":588686},{"po":"PO204477","date":"2/4/2026","dueDate":"","amount":".00","trackingInfo":"Requested by WH for SO182339","id":587396},{"po":"PO204470","date":"2/3/2026","dueDate":"2/6/2026","amount":".00","trackingInfo":"TBA328392669085 ETA - 02/06/2026","id":586877},{"po":"PO204471","date":"2/3/2026","dueDate":"","amount":".00","trackingInfo":"","id":587028},{"po":"PO204475","date":"2/3/2026","dueDate":"","amount":".00","trackingInfo":"","id":587311},{"po":"PO204463","date":"2/2/2026","dueDate":"","amount":".00","trackingInfo":"","id":586287},{"po":"PO204466","date":"2/2/2026","dueDate":"","amount":".00","trackingInfo":"","id":586359},{"po":"PO204452","date":"1/30/2026","dueDate":"","amount":".00","trackingInfo":"","id":584460},{"po":"PO204458","date":"1/30/2026","dueDate":"","amount":".00","trackingInfo":"","id":584726},{"po":"PO204421","date":"1/26/2026","dueDate":"1/29/2026","amount":".00","trackingInfo":"1ZF65J640342569617","id":580813},{"po":"PO204419","date":"1/23/2026","dueDate":"","amount":"122.72","trackingInfo":"ESD Pending","id":580698},{"po":"PO204409","date":"1/22/2026","dueDate":"1/22/2026","amount":"70.00","trackingInfo":"887984364125","id":580054},{"po":"PO204410","date":"1/22/2026","dueDate":"","amount":"250.00","trackingInfo":"PO Created for billing purpose","id":580068},{"po":"PO204412","date":"1/22/2026","dueDate":"","amount":"150.00","trackingInfo":"PO Created for billing purpose","id":580070},{"po":"PO204398","date":"1/21/2026","dueDate":"","amount":".00","trackingInfo":"","id":579531},{"po":"PO204399","date":"1/21/2026","dueDate":"","amount":".00","trackingInfo":"","id":579539},{"po":"PO204374","date":"1/16/2026","dueDate":"","amount":".00","trackingInfo":"COI PO - Customer: Windstream","id":576679},{"po":"PO204375","date":"1/16/2026","dueDate":"","amount":".00","trackingInfo":"","id":576974},{"po":"PO204348","date":"1/13/2026","dueDate":"","amount":".00","trackingInfo":"","id":573356},{"po":"PO204350","date":"1/13/2026","dueDate":"","amount":".00","trackingInfo":"","id":573386},{"po":"PO204355","date":"1/13/2026","dueDate":"","amount":".00","trackingInfo":"","id":573593},{"po":"PO204323","date":"1/7/2026","dueDate":"","amount":".00","trackingInfo":"","id":568700},{"po":"PO204331","date":"1/7/2026","dueDate":"","amount":".00","trackingInfo":"","id":569324},{"po":"PO204313","date":"1/5/2026","dueDate":"","amount":".00","trackingInfo":"","id":567061},{"po":"PO204309","date":"1/2/2026","dueDate":"","amount":".00","trackingInfo":"SO181358 Everphone Inc : Snap-on","id":565388},{"po":"PO204301","date":"12/31/2025","dueDate":"","amount":".00","trackingInfo":"","id":563381},{"po":"PO204293","date":"12/30/2025","dueDate":"","amount":".00","trackingInfo":"","id":562379},{"po":"PO204269","date":"12/23/2025","dueDate":"","amount":".00","trackingInfo":"","id":558271},{"po":"PO204272","date":"12/23/2025","dueDate":"12/23/2025","amount":".00","trackingInfo":"Stock PO to receive tempered glass","id":558395},{"po":"PO204255","date":"12/22/2025","dueDate":"","amount":".00","trackingInfo":"COI PO","id":556778},{"po":"PO204259","date":"12/22/2025","dueDate":"","amount":".00","trackingInfo":"","id":557796},{"po":"PO204236","date":"12/18/2025","dueDate":"","amount":".00","trackingInfo":"","id":555356},{"po":"PO204206","date":"12/12/2025","dueDate":"","amount":".00","trackingInfo":"","id":550630},{"po":"PO204197","date":"12/11/2025","dueDate":"","amount":".00","trackingInfo":"","id":550269},{"po":"PO204191","date":"12/10/2025","dueDate":"","amount":".00","trackingInfo":"","id":549463},{"po":"PO204192","date":"12/10/2025","dueDate":"","amount":".00","trackingInfo":"COI PO for SO180638","id":549570},{"po":"PO204173","date":"12/8/2025","dueDate":"","amount":".00","trackingInfo":"","id":547143},{"po":"PO204165","date":"12/5/2025","dueDate":"12/8/2025","amount":".00","trackingInfo":"Delivered 12/08/2025 1Z6V214R0352830683","id":546153},{"po":"PO204151","date":"12/4/2025","dueDate":"","amount":".00","trackingInfo":"","id":545006},{"po":"PO204154","date":"12/4/2025","dueDate":"","amount":".00","trackingInfo":"$0 stock PO - adapters returned from KCI","id":545295},{"po":"PO204155","date":"12/4/2025","dueDate":"","amount":".00","trackingInfo":"WH team - Qty 85 Zen-Custom-Case-iPad-Mini-7","id":545423},{"po":"PO204123","date":"12/1/2025","dueDate":"","amount":"667.04","trackingInfo":"","id":541451},{"po":"PO204124","date":"12/1/2025","dueDate":"","amount":"579.04","trackingInfo":"","id":541452},{"po":"PO204103","date":"11/26/2025","dueDate":"","amount":".00","trackingInfo":"COI-PO - Customer: Childrens Mercy (SO179243)","id":538065},{"po":"PO204106","date":"11/26/2025","dueDate":"","amount":".00","trackingInfo":"","id":538439},{"po":"PO204116","date":"11/26/2025","dueDate":"","amount":".00","trackingInfo":"","id":539406},{"po":"PO204076","date":"11/21/2025","dueDate":"","amount":".00","trackingInfo":"","id":534235},{"po":"PO204077","date":"11/21/2025","dueDate":"","amount":".00","trackingInfo":"","id":534453},{"po":"PO204078","date":"11/21/2025","dueDate":"","amount":".00","trackingInfo":"","id":534461},{"po":"PO204079","date":"11/21/2025","dueDate":"","amount":".00","trackingInfo":"","id":534770},{"po":"PO204083","date":"11/21/2025","dueDate":"","amount":".00","trackingInfo":"","id":535318},{"po":"PO204085","date":"11/21/2025","dueDate":"","amount":".00","trackingInfo":"","id":535425},{"po":"PO204086","date":"11/21/2025","dueDate":"","amount":".00","trackingInfo":"","id":535647},{"po":"PO204068","date":"11/20/2025","dueDate":"","amount":".00","trackingInfo":"","id":533672},{"po":"PO204070","date":"11/20/2025","dueDate":"","amount":".00","trackingInfo":"","id":533904},{"po":"PO204050","date":"11/19/2025","dueDate":"","amount":".00","trackingInfo":"Delivered 11/12/2025 UPS #1ZX8R9194295668877","id":531332},{"po":"PO204039","date":"11/18/2025","dueDate":"","amount":".00","trackingInfo":"COI-PO SO179697 - Safelite AutoGlass","id":530008},{"po":"PO204016","date":"11/14/2025","dueDate":"","amount":"115.60","trackingInfo":"","id":527061},{"po":"PO204021","date":"11/14/2025","dueDate":"","amount":".00","trackingInfo":"","id":528273},{"po":"PO204002","date":"11/13/2025","dueDate":"","amount":".00","trackingInfo":"","id":526362},{"po":"PO204006","date":"11/13/2025","dueDate":"","amount":".00","trackingInfo":"","id":526638},{"po":"PO203995","date":"11/12/2025","dueDate":"","amount":".00","trackingInfo":"","id":525584},{"po":"PO203928","date":"11/3/2025","dueDate":"","amount":".00","trackingInfo":"","id":517301},{"po":"PO203931","date":"11/3/2025","dueDate":"","amount":".00","trackingInfo":"","id":517350},{"po":"PO203917","date":"10/31/2025","dueDate":"","amount":".00","trackingInfo":"","id":514623},{"po":"PO203907","date":"10/30/2025","dueDate":"","amount":".00","trackingInfo":"","id":513469},{"po":"PO203911","date":"10/30/2025","dueDate":"","amount":".00","trackingInfo":"Delivered 10/30/2025 DHL Express #2145605523","id":514240},{"po":"PO203912","date":"10/30/2025","dueDate":"","amount":".00","trackingInfo":"","id":514251},{"po":"PO203899","date":"10/29/2025","dueDate":"","amount":".00","trackingInfo":"","id":511054},{"po":"PO203889","date":"10/28/2025","dueDate":"","amount":".00","trackingInfo":"","id":509293},{"po":"PO203891","date":"10/28/2025","dueDate":"","amount":".00","trackingInfo":"","id":509825},{"po":"PO203892","date":"10/28/2025","dueDate":"","amount":".00","trackingInfo":"COI PO for SO178688 & SO178686","id":510052},{"po":"PO203877","date":"10/27/2025","dueDate":"","amount":".00","trackingInfo":"","id":507784},{"po":"PO203883","date":"10/27/2025","dueDate":"","amount":".00","trackingInfo":"ETA 10/30/25","id":508346},{"po":"PO203857","date":"10/23/2025","dueDate":"","amount":".00","trackingInfo":"","id":504685},{"po":"PO203860","date":"10/23/2025","dueDate":"","amount":".00","trackingInfo":"","id":505126},{"po":"PO203861","date":"10/23/2025","dueDate":"","amount":".00","trackingInfo":"","id":505267},{"po":"PO203826","date":"10/18/2025","dueDate":"","amount":"2421.27","trackingInfo":"","id":500112},{"po":"PO203791","date":"10/14/2025","dueDate":"10/15/2025","amount":".00","trackingInfo":"DELIVERED 10/15/2025 DHL #4191106533","id":494329},{"po":"PO203793","date":"10/14/2025","dueDate":"10/14/2025","amount":".00","trackingInfo":"Delivered 10/14/2025 UPS #1Z37V5490350404278","id":494442},{"po":"PO203732","date":"10/8/2025","dueDate":"","amount":".00","trackingInfo":"","id":485617},{"po":"PO203712","date":"10/6/2025","dueDate":"","amount":".00","trackingInfo":"","id":482741},{"po":"PO203704","date":"10/3/2025","dueDate":"","amount":".00","trackingInfo":"","id":481536},{"po":"PO203709","date":"10/3/2025","dueDate":"","amount":".00","trackingInfo":"","id":481952},{"po":"PO203696","date":"10/2/2025","dueDate":"","amount":"200.10","trackingInfo":"","id":480810},{"po":"PO203698","date":"10/2/2025","dueDate":"","amount":".00","trackingInfo":"","id":480825},{"po":"PO203655","date":"9/26/2025","dueDate":"","amount":"58720.12","trackingInfo":"Multiple SO deliveries - Thales USA, Arizona Hair, Clinton County, etc.","id":473662},{"po":"PO203617","date":"9/23/2025","dueDate":"","amount":"580.04","trackingInfo":"","id":468873},{"po":"PO203618","date":"9/23/2025","dueDate":"","amount":"579.04","trackingInfo":"","id":468875},{"po":"PO203619","date":"9/23/2025","dueDate":"","amount":"403.04","trackingInfo":"","id":468877},{"po":"PO203565","date":"9/17/2025","dueDate":"","amount":"579.04","trackingInfo":"","id":461908},{"po":"PO203503","date":"9/8/2025","dueDate":"","amount":"3136.00","trackingInfo":"License Enrolled","id":453923},{"po":"PO203462","date":"8/29/2025","dueDate":"","amount":"5447.00","trackingInfo":"","id":448168},{"po":"PO203465","date":"8/29/2025","dueDate":"","amount":"3415.00","trackingInfo":"","id":448725},{"po":"PO203366","date":"8/19/2025","dueDate":"","amount":".00","trackingInfo":"Delivered 9/23/2025 USPS #9434650899561035760967","id":439201},{"po":"PO203338","date":"8/15/2025","dueDate":"","amount":".00","trackingInfo":"","id":436518},{"po":"PO203339","date":"8/15/2025","dueDate":"","amount":".00","trackingInfo":"","id":436523},{"po":"PO203333","date":"8/14/2025","dueDate":"","amount":".00","trackingInfo":"","id":435623},{"po":"PO203320","date":"8/13/2025","dueDate":"","amount":".00","trackingInfo":"","id":433815},{"po":"PO203310","date":"8/12/2025","dueDate":"","amount":".00","trackingInfo":"Delivered 8/11/25 FedEx #883368579445","id":432688},{"po":"PO203312","date":"8/12/2025","dueDate":"","amount":".00","trackingInfo":"","id":433049},{"po":"PO203298","date":"8/11/2025","dueDate":"","amount":".00","trackingInfo":"","id":431922},{"po":"PO203278","date":"8/7/2025","dueDate":"","amount":".00","trackingInfo":"","id":430809},{"po":"PO203283","date":"8/7/2025","dueDate":"","amount":"403.04","trackingInfo":"","id":430954},{"po":"PO203285","date":"8/7/2025","dueDate":"","amount":".00","trackingInfo":"","id":430978},{"po":"PO203264","date":"8/6/2025","dueDate":"","amount":".00","trackingInfo":"","id":429674},{"po":"PO203266","date":"8/6/2025","dueDate":"","amount":"1250.00","trackingInfo":"FedEx #7500662120","id":429854},{"po":"PO203253","date":"8/5/2025","dueDate":"","amount":".00","trackingInfo":"","id":428325},{"po":"PO203257","date":"8/5/2025","dueDate":"","amount":".00","trackingInfo":"","id":428952},{"po":"PO203230","date":"8/4/2025","dueDate":"","amount":".00","trackingInfo":"","id":426955},{"po":"PO203237","date":"8/4/2025","dueDate":"","amount":".00","trackingInfo":"","id":427134},{"po":"PO203239","date":"8/4/2025","dueDate":"","amount":".00","trackingInfo":"","id":427297},{"po":"PO203214","date":"7/30/2025","dueDate":"","amount":".00","trackingInfo":"","id":423214},{"po":"PO203169","date":"7/25/2025","dueDate":"","amount":".00","trackingInfo":"Delivered 7/29/2025 FedEx #883038864071","id":418790},{"po":"PO203097","date":"7/15/2025","dueDate":"","amount":".00","trackingInfo":"","id":411372},{"po":"PO203079","date":"7/11/2025","dueDate":"7/11/2025","amount":".00","trackingInfo":"Delivered 07/11/2025 FedEx #882645503728","id":410214},{"po":"PO203068","date":"7/10/2025","dueDate":"7/10/2025","amount":".00","trackingInfo":"Delivered 07/10/2025 FedEx #466776556027","id":409003},{"po":"PO203065","date":"7/9/2025","dueDate":"","amount":".00","trackingInfo":"","id":408373},{"po":"PO203051","date":"7/8/2025","dueDate":"","amount":".00","trackingInfo":"Multiple UPS deliveries completed 07/08-07/17","id":406764},{"po":"PO203052","date":"7/8/2025","dueDate":"","amount":".00","trackingInfo":"","id":406928},{"po":"PO203036","date":"7/3/2025","dueDate":"","amount":".00","trackingInfo":"","id":405643},{"po":"PO203024","date":"7/2/2025","dueDate":"","amount":".00","trackingInfo":"","id":404534},{"po":"PO203017","date":"6/30/2025","dueDate":"","amount":".00","trackingInfo":"","id":402201},{"po":"PO202983","date":"6/26/2025","dueDate":"","amount":".00","trackingInfo":"","id":399336},{"po":"PO202987","date":"6/26/2025","dueDate":"6/26/2025","amount":".00","trackingInfo":"Delivered 06/26/2025 UPS #1Z4367573530939681","id":399731},{"po":"PO202991","date":"6/26/2025","dueDate":"6/27/2025","amount":".00","trackingInfo":"DELIVERED 6/27/2025 FedEx #3903 8013 1840","id":400266},{"po":"PO202957","date":"6/23/2025","dueDate":"","amount":"26866.13","trackingInfo":"Multiple SO deliveries ongoing - Sheriff, Fulton County, Ross","id":396462},{"po":"PO202950","date":"6/20/2025","dueDate":"","amount":".00","trackingInfo":"","id":395777},{"po":"PO202951","date":"6/20/2025","dueDate":"6/20/2025","amount":".00","trackingInfo":"Delivered 06/20/2025 FedEx #797428653819","id":395882},{"po":"PO202863","date":"6/9/2025","dueDate":"","amount":".00","trackingInfo":"Delivered 6/9/2025 FedEx #881813948371","id":387603},{"po":"PO202839","date":"6/5/2025","dueDate":"6/5/2025","amount":".00","trackingInfo":"DELIVERED 6/5/2025 AMAZON #TBA321885131422","id":385120},{"po":"PO202851","date":"6/5/2025","dueDate":"","amount":".00","trackingInfo":"","id":385529},{"po":"PO202835","date":"6/4/2025","dueDate":"","amount":".00","trackingInfo":"","id":385103},{"po":"PO202829","date":"6/3/2025","dueDate":"6/3/2025","amount":"100.00","trackingInfo":"Delivered 06/03/2025 UPS #1Z82T3T20396919250","id":383796},{"po":"PO202819","date":"6/2/2025","dueDate":"","amount":".00","trackingInfo":"Delivered USPS #9434636208235280784556","id":382667},{"po":"PO202820","date":"6/2/2025","dueDate":"","amount":".00","trackingInfo":"","id":382781},{"po":"PO202807","date":"5/28/2025","dueDate":"","amount":".00","trackingInfo":"","id":379429},{"po":"PO202776","date":"5/22/2025","dueDate":"","amount":".00","trackingInfo":"","id":375559},{"po":"PO202780","date":"5/22/2025","dueDate":"","amount":".00","trackingInfo":"","id":375953},{"po":"PO202781","date":"5/22/2025","dueDate":"","amount":".00","trackingInfo":"Delivered 05/22/2025 FedEx #288870002472","id":376060},{"po":"PO202763","date":"5/21/2025","dueDate":"5/23/2025","amount":".00","trackingInfo":"DELIVERED 5/23/2025 UPS #1Z733F6V4205262666","id":374677},{"po":"PO202766","date":"5/21/2025","dueDate":"","amount":".00","trackingInfo":"","id":375090},{"po":"PO202754","date":"5/20/2025","dueDate":"5/21/2025","amount":".00","trackingInfo":"DELIVERED 5/21/2025 AMAZON #TBA321522549189","id":373830},{"po":"PO202737","date":"5/16/2025","dueDate":"","amount":"133.88","trackingInfo":"","id":371947},{"po":"PO202724","date":"5/14/2025","dueDate":"","amount":".00","trackingInfo":"","id":370016},{"po":"PO202725","date":"5/14/2025","dueDate":"5/15/2025","amount":".00","trackingInfo":"DELIVERED 5/15/2025 FEDEX #457579313304","id":370034},{"po":"PO202714","date":"5/13/2025","dueDate":"","amount":".00","trackingInfo":"","id":368545},{"po":"PO202709","date":"5/12/2025","dueDate":"","amount":".00","trackingInfo":"DELIVERED 5/9/2025 FedEx #881085995640","id":367556},{"po":"PO202711","date":"5/12/2025","dueDate":"","amount":"375.00","trackingInfo":"","id":367739},{"po":"PO202702","date":"5/9/2025","dueDate":"5/12/2025","amount":".00","trackingInfo":"DELIVERED 5/12/2025 USPS #9361289739048209387794","id":366820},{"po":"PO202692","date":"5/8/2025","dueDate":"5/8/2025","amount":".00","trackingInfo":"Delivered 05/08/2025 UPS #1Z6514940319828987","id":366315},{"po":"PO202673","date":"5/5/2025","dueDate":"","amount":"15.00","trackingInfo":"","id":363644},{"po":"PO202675","date":"5/5/2025","dueDate":"","amount":".00","trackingInfo":"","id":363921},{"po":"PO202650","date":"5/1/2025","dueDate":"","amount":".00","trackingInfo":"","id":361567},{"po":"PO202651","date":"5/1/2025","dueDate":"","amount":".00","trackingInfo":"","id":361568},{"po":"PO202653","date":"5/1/2025","dueDate":"5/1/2025","amount":".00","trackingInfo":"","id":361604},{"po":"PO202639","date":"4/30/2025","dueDate":"","amount":".00","trackingInfo":"","id":360396},{"po":"PO202597","date":"4/25/2025","dueDate":"","amount":".00","trackingInfo":"","id":355866},{"po":"PO202567","date":"4/23/2025","dueDate":"","amount":".00","trackingInfo":"DELIVERED 1/11/2025 USPS #9434611899560411374423","id":352876},{"po":"PO202570","date":"4/23/2025","dueDate":"","amount":".00","trackingInfo":"DELIVERED 12/30/2024 USPS #9434611899561997599170","id":352883},{"po":"PO202571","date":"4/23/2025","dueDate":"","amount":".00","trackingInfo":"DELIVERED 1/16/2025 USPS #9434611899560520813509","id":352885},{"po":"PO202573","date":"4/23/2025","dueDate":"","amount":".00","trackingInfo":"DELIVERED 1/21/2025 USPS #9434611899560502057129","id":352900},{"po":"PO202605","date":"4/17/2025","dueDate":"4/17/2025","amount":".00","trackingInfo":"","id":356347},{"po":"PO202442","date":"4/8/2025","dueDate":"","amount":".00","trackingInfo":"Delivered 4/10/2025 FedEx #430753678147","id":341559},{"po":"PO202292","date":"4/1/2025","dueDate":"","amount":"7826.33","trackingInfo":"ESD Pending (Virtual inventory)","id":326524},{"po":"PO202418","date":"3/31/2025","dueDate":"","amount":"176.09","trackingInfo":"","id":337931},{"po":"PO202387","date":"3/28/2025","dueDate":"","amount":"1250.00","trackingInfo":"","id":334369},{"po":"PO202277","date":"3/18/2025","dueDate":"3/26/2025","amount":"64.99","trackingInfo":"DELIVERED 3/26/2025 FEDEX #286790806101","id":325269},{"po":"PO202259","date":"3/14/2025","dueDate":"","amount":".00","trackingInfo":"","id":322975},{"po":"PO202249","date":"3/13/2025","dueDate":"","amount":"1197.00","trackingInfo":"","id":322172},{"po":"PO202217","date":"3/10/2025","dueDate":"","amount":".00","trackingInfo":"DELIVERED 3/12/2025 FEDEX #286277920438","id":319969},{"po":"PO202193","date":"3/6/2025","dueDate":"","amount":"43.38","trackingInfo":"DELIVERED 3/06/2025","id":317979},{"po":"PO202175","date":"3/4/2025","dueDate":"","amount":".00","trackingInfo":"Delivered 02/26/2025 FedEx #430753660292","id":316069},{"po":"PO202177","date":"3/4/2025","dueDate":"3/7/2025","amount":"28.36","trackingInfo":"DELIVERED 3/07/2025 UPS #1ZR393E70396543329","id":316325},{"po":"PO202178","date":"3/4/2025","dueDate":"2/24/2025","amount":".00","trackingInfo":"DELIVERED 2/24/2025 FedEx #430753659314","id":316456},{"po":"PO202080","date":"2/21/2025","dueDate":"","amount":".00","trackingInfo":"","id":306063},{"po":"PO202056","date":"2/19/2025","dueDate":"","amount":"4500.00","trackingInfo":"","id":303798},{"po":"PO202058","date":"2/19/2025","dueDate":"","amount":".00","trackingInfo":"","id":303811},{"po":"PO201933","date":"1/30/2025","dueDate":"","amount":".00","trackingInfo":"","id":287454},{"po":"PO201862","date":"1/15/2025","dueDate":"","amount":".00","trackingInfo":"ETA 1/16/25","id":279437},{"po":"PO201845","date":"1/14/2025","dueDate":"1/15/2025","amount":".00","trackingInfo":"ETA 01/15/25","id":278230},{"po":"PO201847","date":"1/14/2025","dueDate":"","amount":".00","trackingInfo":"","id":278341},{"po":"PO201780","date":"12/31/2024","dueDate":"","amount":"2882.00","trackingInfo":"","id":269072},{"po":"PO201746","date":"12/23/2024","dueDate":"","amount":".00","trackingInfo":"","id":262970},{"po":"PO201695","date":"12/13/2024","dueDate":"","amount":"84.28","trackingInfo":"","id":256238},{"po":"PO201651","date":"12/11/2024","dueDate":"","amount":"28.09","trackingInfo":"","id":249771},{"po":"PO201572","date":"11/26/2024","dueDate":"11/25/2024","amount":"1517.04","trackingInfo":"Delivered 11/25/2024 FedEx #282149392189","id":238495},{"po":"PO201503","date":"11/13/2024","dueDate":"12/5/2024","amount":"296.84","trackingInfo":"DELIVERED 12/05/2024 [9704-RD06]","id":222096},{"po":"PO201420","date":"10/31/2024","dueDate":"","amount":".00","trackingInfo":"","id":207001},{"po":"PO201310","date":"10/18/2024","dueDate":"11/25/2024","amount":"77.71","trackingInfo":"DELIVERED 10/25/2024 UPS #1Z3437010311614492","id":195885},{"po":"PO200509","date":"5/31/2024","dueDate":"","amount":"233.04","trackingInfo":"","id":71308}],"pendingReceipt":[{"po":"PO205192","date":"5/27/2026","dueDate":"5/28/2026","amount":"115.20","trackingInfo":"USPS - 9361289739064475550595","id":684206},{"po":"PO205193","date":"5/27/2026","dueDate":"","amount":".00","trackingInfo":"","id":684237},{"po":"PO205186","date":"5/26/2026","dueDate":"","amount":"488.68","trackingInfo":"ESD Pending","id":683180},{"po":"PO205187","date":"5/26/2026","dueDate":"6/4/2026","amount":"874.65","trackingInfo":"ESD","id":683239},{"po":"PO205188","date":"5/26/2026","dueDate":"5/28/2026","amount":"659.94","trackingInfo":"ETA","id":683674},{"po":"PO205181","date":"5/22/2026","dueDate":"6/1/2026","amount":"9900.00","trackingInfo":"ESD Pending","id":679863},{"po":"PO205182","date":"5/22/2026","dueDate":"5/27/2026","amount":".14","trackingInfo":"UPS #1ZB8B8340306124068","id":679964},{"po":"PO205185","date":"5/22/2026","dueDate":"","amount":"3420.00","trackingInfo":"ESD Pending (License)","id":680654},{"po":"PO205175","date":"5/21/2026","dueDate":"5/26/2026","amount":"9490.00","trackingInfo":"FedEx Tracking # 381508196885","id":679541},{"po":"PO205177","date":"5/21/2026","dueDate":"","amount":"2787.66","trackingInfo":"Back-order, in-house date 5/29/26","id":679673},{"po":"PO205178","date":"5/21/2026","dueDate":"5/27/2026","amount":"199.90","trackingInfo":"ESD","id":679675},{"po":"PO205180","date":"5/21/2026","dueDate":"","amount":".00","trackingInfo":"","id":679682},{"po":"PO205166","date":"5/20/2026","dueDate":"5/26/2026","amount":"223.08","trackingInfo":"Delivered #9434608106245182587100 invoice attached","id":678377},{"po":"PO205169","date":"5/20/2026","dueDate":"5/26/2026","amount":"111960.00","trackingInfo":"UPS #1Z462E560308468089 + Maersk #387011507","id":678753},{"po":"PO205156","date":"5/19/2026","dueDate":"5/22/2026","amount":"3834.90","trackingInfo":"UPS #1ZW5498X0349022904 / #1ZB8B8340306098141 / ESD 05/26","id":677160},{"po":"PO205162","date":"5/19/2026","dueDate":"5/28/2026","amount":"547.92","trackingInfo":"USPS #9234690261207997024648","id":677807},{"po":"PO205136","date":"5/15/2026","dueDate":"5/28/2026","amount":"19817.58","trackingInfo":"Amazon Tracking # 9339589739064395589486","id":674751},{"po":"PO205116","date":"5/14/2026","dueDate":"","amount":"3600.00","trackingInfo":"Awaiting activation team confirmation","id":672722},{"po":"PO205120","date":"5/14/2026","dueDate":"","amount":"2259.00","trackingInfo":"Awaiting tracking [Follow up sent]","id":673187},{"po":"PO205106","date":"5/13/2026","dueDate":"5/21/2026","amount":"730.00","trackingInfo":"ETA","id":671184},{"po":"PO205110","date":"5/13/2026","dueDate":"","amount":".00","trackingInfo":"ESD","id":671736},{"po":"PO205092","date":"5/12/2026","dueDate":"5/28/2026","amount":"840.00","trackingInfo":"UPS - 1ZA6D1340404822535","id":669518},{"po":"PO205081","date":"5/11/2026","dueDate":"","amount":"21208.00","trackingInfo":"Awaiting tracking - Samsung pushed to week of 6/08","id":668263},{"po":"PO205085","date":"5/11/2026","dueDate":"","amount":"2357.37","trackingInfo":"ESD Pending","id":668994},{"po":"PO205071","date":"5/8/2026","dueDate":"5/13/2026","amount":"5999.50","trackingInfo":"ETA invoice attached","id":667672},{"po":"PO205076","date":"5/8/2026","dueDate":"","amount":"392.80","trackingInfo":"Awaiting tracking - Following up with vendor","id":667719},{"po":"PO205059","date":"5/7/2026","dueDate":"","amount":"5280.00","trackingInfo":"ESD","id":665845},{"po":"PO205062","date":"5/7/2026","dueDate":"","amount":"704.68","trackingInfo":"ESD Pending (Backorder)","id":666306},{"po":"PO205045","date":"5/6/2026","dueDate":"5/21/2026","amount":"277203.80","trackingInfo":"Multiple UPS tracking numbers (38+13+29 units)","id":664189},{"po":"PO205046","date":"5/6/2026","dueDate":"","amount":".00","trackingInfo":"","id":664407},{"po":"PO205029","date":"5/4/2026","dueDate":"","amount":".00","trackingInfo":"","id":660988},{"po":"PO205026","date":"5/1/2026","dueDate":"","amount":"8264.60","trackingInfo":"ESD (Backorder)","id":660011},{"po":"PO204992","date":"4/27/2026","dueDate":"","amount":"1224.93","trackingInfo":"PO cancelled - devices no longer available","id":649734},{"po":"PO204864","date":"4/6/2026","dueDate":"","amount":".00","trackingInfo":"COI PO","id":630610},{"po":"PO204849","date":"3/31/2026","dueDate":"4/6/2026","amount":"1847.59","trackingInfo":"Delivered UPS #1ZB8B8330307174255","id":626482},{"po":"PO204728","date":"3/13/2026","dueDate":"","amount":".00","trackingInfo":"","id":613668},{"po":"PO204712","date":"3/12/2026","dueDate":"","amount":"2561.97","trackingInfo":"ESD","id":611856},{"po":"PO204708","date":"3/11/2026","dueDate":"","amount":"164000.00","trackingInfo":"ESD Pending","id":611569},{"po":"PO204675","date":"3/6/2026","dueDate":"","amount":".00","trackingInfo":"COI PO","id":608846},{"po":"PO204601","date":"2/25/2026","dueDate":"","amount":".00","trackingInfo":"COI PO","id":601142},{"po":"PO204520","date":"2/10/2026","dueDate":"","amount":".00","trackingInfo":"Receiving PO","id":591138},{"po":"PO204525","date":"2/10/2026","dueDate":"4/30/2026","amount":".00","trackingInfo":"TEST PO ONCE AGAIN","id":591400},{"po":"PO204450","date":"1/29/2026","dueDate":"","amount":"3500.58","trackingInfo":"ESD 03/31/2026","id":583961},{"po":"PO204385","date":"1/19/2026","dueDate":"","amount":".00","trackingInfo":"COI PO","id":577748},{"po":"PO204343","date":"1/12/2026","dueDate":"1/28/2026","amount":"65.09","trackingInfo":"Delivered USPS - working with vendor/carrier for resolution","id":572352},{"po":"PO204278","date":"12/24/2025","dueDate":"","amount":"3125.00","trackingInfo":"","id":558997},{"po":"PO204100","date":"11/25/2025","dueDate":"","amount":"480.00","trackingInfo":"Apple care","id":538039},{"po":"PO204101","date":"11/25/2025","dueDate":"","amount":".00","trackingInfo":"","id":538042},{"po":"PO203967","date":"11/7/2025","dueDate":"11/8/2025","amount":"23.98","trackingInfo":"Delivered Amazon #TBA325764721752","id":522052},{"po":"PO203897","date":"10/28/2025","dueDate":"","amount":".00","trackingInfo":"PO Created by GT","id":510607},{"po":"PO203845","date":"10/22/2025","dueDate":"12/22/2025","amount":"176.47","trackingInfo":"Delivered FedEx # 491167709510","id":503368},{"po":"PO203547","date":"9/15/2025","dueDate":"","amount":"221.76","trackingInfo":"ESD Pending","id":459195},{"po":"PO203542","date":"9/12/2025","dueDate":"","amount":".00","trackingInfo":"Delivered 09/12/2025 DHL #3163639640","id":458411},{"po":"PO203526","date":"9/10/2025","dueDate":"9/10/2025","amount":".00","trackingInfo":"DELIVERED","id":455728},{"po":"PO203361","date":"8/19/2025","dueDate":"","amount":"321.12","trackingInfo":"Receiving Pending","id":438945},{"po":"PO203362","date":"8/19/2025","dueDate":"","amount":"92.32","trackingInfo":"Receiving Pending","id":438946},{"po":"PO203033","date":"7/3/2025","dueDate":"7/11/2025","amount":"1250.00","trackingInfo":"Delivered FedEx #7500662120","id":405612},{"po":"PO202918","date":"6/16/2025","dueDate":"6/17/2025","amount":".00","trackingInfo":"ETA 6/17/2025","id":392222},{"po":"PO202751","date":"5/19/2025","dueDate":"","amount":"60.00","trackingInfo":"License - disconnect end of July","id":373641},{"po":"PO202646","date":"5/1/2025","dueDate":"","amount":".00","trackingInfo":"","id":361377},{"po":"PO202589","date":"4/24/2025","dueDate":"","amount":".00","trackingInfo":"ETA PENDING USPS","id":354804},{"po":"PO202427","date":"4/3/2025","dueDate":"","amount":".00","trackingInfo":"","id":339455},{"po":"PO202421","date":"4/2/2025","dueDate":"","amount":"419.93","trackingInfo":"DELIVERED USPS #1Z93841R0395907250","id":338138},{"po":"PO202373","date":"3/26/2025","dueDate":"3/27/2025","amount":".00","trackingInfo":"ETA 3/27/2025","id":332740},{"po":"PO202308","date":"3/20/2025","dueDate":"","amount":".00","trackingInfo":"Delivered USPS","id":327971},{"po":"PO202152","date":"2/28/2025","dueDate":"","amount":"705.72","trackingInfo":"","id":314469},{"po":"PO201639","date":"12/9/2024","dueDate":"12/10/2024","amount":"1009.01","trackingInfo":"ETA 12/10/24","id":246740},{"po":"PO201464","date":"11/7/2024","dueDate":"11/13/2024","amount":"29.68","trackingInfo":"DELIVERED 11/13/2024 FedEx #281590914984","id":212495},{"po":"PO200662","date":"7/1/2024","dueDate":"6/10/2024","amount":".00","trackingInfo":"Delivered 06/10/2024 FedEx #776760005206","id":98733},{"po":"PO200223","date":"4/8/2024","dueDate":"4/11/2024","amount":"69.95","trackingInfo":"DELIVERED 4/11/2024 FedEx #704953166878","id":29077}],"pendingBillPartReceived":[{"po":"PO205171","date":"5/20/2026","dueDate":"5/28/2026","amount":"1078.11","trackingInfo":"ESD Pending (Qty 1 MG52E-HW) / Delivered FedEx #526286265383","id":678789},{"po":"PO205172","date":"5/20/2026","dueDate":"5/27/2026","amount":"3987.60","trackingInfo":"121297195102 - 5/27 / 120901860800 Delivered / 121514616704 - 5/27","id":678909},{"po":"PO205154","date":"5/19/2026","dueDate":"","amount":"1387.50","trackingInfo":"ESD","id":677060},{"po":"PO204998","date":"4/27/2026","dueDate":"5/4/2026","amount":"3580.50","trackingInfo":"UPS #1Z14V49E4222143389","id":651518},{"po":"PO204882","date":"4/8/2026","dueDate":"","amount":".00","trackingInfo":"COI PO","id":633310},{"po":"PO204870","date":"4/6/2026","dueDate":"","amount":".00","trackingInfo":"COI PO","id":630852},{"po":"PO204871","date":"4/6/2026","dueDate":"4/17/2026","amount":"3594.00","trackingInfo":"UPS #1Z462E560308125994 / MHRQ4LL/A & MHRP4LL/A on backorder","id":631203},{"po":"PO204859","date":"4/3/2026","dueDate":"4/6/2026","amount":"9456.80","trackingInfo":"6 units delivered UPS #1Z7824730343627869 / 34 units on BO","id":629500},{"po":"PO204806","date":"3/26/2026","dueDate":"3/25/2026","amount":"2115.92","trackingInfo":"Delivered FedEx #518451261439","id":621035},{"po":"PO204709","date":"3/11/2026","dueDate":"","amount":".00","trackingInfo":"","id":611588},{"po":"PO204691","date":"3/10/2026","dueDate":"3/16/2026","amount":"34915.00","trackingInfo":"UPS #1ZB8B8330306996440 Qty 15 delivered / FedEx #516786034760 Qty 15","id":610194},{"po":"PO204686","date":"3/9/2026","dueDate":"3/12/2026","amount":"2500.00","trackingInfo":"1ZW821F30344656487","id":609369},{"po":"PO204671","date":"3/6/2026","dueDate":"3/30/2026","amount":"849.00","trackingInfo":"UPS tracking #1Z216A050438277275","id":608590},{"po":"PO204645","date":"3/3/2026","dueDate":"","amount":".00","trackingInfo":"COI PO","id":606064},{"po":"PO204454","date":"1/30/2026","dueDate":"","amount":".00","trackingInfo":"Ref PO203701 - SO182472","id":584475},{"po":"PO204427","date":"1/27/2026","dueDate":"","amount":".00","trackingInfo":"CO PO","id":581746},{"po":"PO204271","date":"12/23/2025","dueDate":"","amount":"13000.00","trackingInfo":"","id":558391},{"po":"PO203951","date":"11/6/2025","dueDate":"","amount":".00","trackingInfo":"eBay items - warehouse receiving","id":520516},{"po":"PO203701","date":"10/3/2025","dueDate":"5/1/2026","amount":"403780.00","trackingInfo":"Multiple DHL/UPS/FedEx shipments - Microsoft Surface Go3","id":481173},{"po":"PO203683","date":"10/1/2025","dueDate":"","amount":".00","trackingInfo":"ESD 10/3/2025","id":479107},{"po":"PO203472","date":"9/3/2025","dueDate":"9/4/2025","amount":"30.68","trackingInfo":"Delivered 09/04/2025 FedEx #884079436353","id":450766},{"po":"PO203380","date":"8/21/2025","dueDate":"","amount":"712.60","trackingInfo":"Devices returned from ConnectWise","id":440928},{"po":"PO203238","date":"8/4/2025","dueDate":"","amount":".00","trackingInfo":"ESD Pending","id":427141},{"po":"PO203224","date":"7/31/2025","dueDate":"","amount":".00","trackingInfo":"PO to receive inventory from warehouse","id":424797},{"po":"PO203035","date":"7/3/2025","dueDate":"","amount":".00","trackingInfo":"Delivered FedEx #390628039977","id":405637},{"po":"PO202970","date":"6/24/2025","dueDate":"","amount":".00","trackingInfo":"Delivered 6/27/2025 FedEx #430753700988","id":397962},{"po":"PO202935","date":"6/18/2025","dueDate":"7/21/2025","amount":"44680.00","trackingInfo":"UPS Tracking #1Z8A586F0459980449","id":393858},{"po":"PO202408","date":"3/31/2025","dueDate":"","amount":".00","trackingInfo":"","id":336120},{"po":"PO202134","date":"2/27/2025","dueDate":"","amount":".00","trackingInfo":"","id":311361},{"po":"PO202084","date":"2/21/2025","dueDate":"","amount":".00","trackingInfo":"","id":307220},{"po":"PO201936","date":"1/30/2025","dueDate":"","amount":".00","trackingInfo":"","id":287761},{"po":"PO201773","date":"12/31/2024","dueDate":"","amount":"1091010.00","trackingInfo":"Multiple shipments ongoing - DHL, FedEx, UPS","id":268645},{"po":"PO201579","date":"11/27/2024","dueDate":"11/27/2024","amount":".00","trackingInfo":"DELIVERED 11/27/2024 UPS #1Z1752842926311671","id":238914}],"partiallyReceived":[{"po":"PO204938","date":"4/17/2026","dueDate":"6/1/2026","amount":"18413.00","trackingInfo":"118 devices enrolled 04/30/2026 / 25 devices pending","id":642305},{"po":"PO204895","date":"4/13/2026","dueDate":"4/28/2026","amount":"25607.95","trackingInfo":"UPS #1ZY863W10399083053 / FedEx #302668028408 / PID: BT684328 missing","id":637029},{"po":"PO204868","date":"4/7/2026","dueDate":"4/10/2026","amount":"3850.00","trackingInfo":"UPS 1Z0465CG4235442761","id":630724},{"po":"PO204678","date":"3/6/2026","dueDate":"3/17/2026","amount":"102200.00","trackingInfo":"T Force Freight Tracking # 444633663","id":608896},{"po":"PO204099","date":"11/25/2025","dueDate":"3/26/2026","amount":"299000.00","trackingInfo":"FedEx #499134525391 (Qty-24) / #302214635070 (Qty-500) / #300467219930 (Qty-470)","id":537478},{"po":"PO203873","date":"10/24/2025","dueDate":"10/28/2025","amount":"79.90","trackingInfo":"Delivered UPS #1Z0F52710387697009, 1ZX373F90357234433","id":506678},{"po":"PO203738","date":"10/8/2025","dueDate":"","amount":"159208.73","trackingInfo":"Multiple Cisco deliveries FedEx / ESD 11/25/2025 for remaining","id":486325},{"po":"PO203686","date":"10/1/2025","dueDate":"","amount":"37765.86","trackingInfo":"FedEx #471097156057 delivered / ESD 12/16/2025 remaining","id":479340},{"po":"PO202493","date":"4/15/2025","dueDate":"4/16/2025","amount":"950.60","trackingInfo":"DELIVERED 4/16/2025 UPS #1ZR7718J0210894512","id":346688},{"po":"PO200372","date":"5/1/2024","dueDate":"5/8/2024","amount":"8120.00","trackingInfo":"DELIVERED 5/8/2024 FEDEX #776251521539 (Qty-29)","id":51596}]};
+
+const NS_BASE = "https://3662910.app.netsuite.com/app/accounting/transactions/purchord.nl?id=";
+
+const STATUS_CONFIG = {
+  pendingBilling:          { label:"Pending Bill",                         icon:"📄", accent:"#f59e0b" },
+  pendingReceipt:          { label:"Pending Receipt",                      icon:"📦", accent:"#3b82f6" },
+  pendingBillPartReceived: { label:"Pending Billing / Partially Received", icon:"🔖", accent:"#8b5cf6" },
+  partiallyReceived:       { label:"Partially Received",                   icon:"📬", accent:"#10b981" }
+};
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let activeStatuses = new Set();
+let zeroOnly       = false;
+let sortState      = {};   // { key: { col, dir } }
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const NS   = n => `https://3662910.app.netsuite.com/app/accounting/transactions/purchord.nl?id=${n}`;
+const amt  = v => parseFloat(String(v||"0").replace(/,/g,"")) || 0;
+const isZero = r => amt(r.amount) === 0;
+
+function fmtMoney(n) {
+  if (!n) return null;
+  return "$" + n.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+
+function parseDate(str) {
+  if (!str) return 0;
+  const [m,d,y] = str.split("/");
+  return new Date(+y, +m-1, +d).getTime();
+}
+
+function today() { return new Date("2026-05-27").getTime(); }
+
+function isOverdue(dueDate) {
+  if (!dueDate) return false;
+  return parseDate(dueDate) < today();
+}
+
+// ── Filtering & Sorting ───────────────────────────────────────────────────────
+function getFiltered(key) {
+  const q = document.getElementById("search").value.toLowerCase().trim();
+  let rows = DATA[key];
+  if (zeroOnly) rows = rows.filter(isZero);
+  if (q) rows = rows.filter(r =>
+    r.po.toLowerCase().includes(q) ||
+    r.date.toLowerCase().includes(q) ||
+    (r.dueDate||"").toLowerCase().includes(q) ||
+    (r.trackingInfo||"").toLowerCase().includes(q)
+  );
+  // Sort
+  const s = sortState[key];
+  if (s) {
+    rows = [...rows].sort((a,b) => {
+      let av, bv;
+      if (s.col==="amount") { av=amt(a.amount); bv=amt(b.amount); }
+      else if (s.col==="date")    { av=parseDate(a.date);    bv=parseDate(b.date); }
+      else if (s.col==="dueDate") { av=parseDate(a.dueDate); bv=parseDate(b.dueDate); }
+      else { av=(a[s.col]||"").toLowerCase(); bv=(b[s.col]||"").toLowerCase(); }
+      return s.dir==="asc" ? (av>bv?1:-1) : (av<bv?1:-1);
+    });
+  }
+  return rows;
+}
+
+// ── Build KPI Tiles ───────────────────────────────────────────────────────────
+function buildKPI() {
+  const grid = document.getElementById("kpi-grid");
+  Object.entries(STATUS_CONFIG).forEach(([key, cfg]) => {
+    const count = DATA[key].length;
+    const total = DATA[key].reduce((s,r)=>s+amt(r.amount),0);
+    const card = document.createElement("div");
+    card.className = "kpi-card"; card.id = "kpi-"+key; card.dataset.key = key;
+    card.onclick = () => toggleStatus(key);
+    card.innerHTML = `
+      <div class="kpi-header">
+        <span class="kpi-icon">${cfg.icon}</span>
+        <span class="kpi-check">✓ ACTIVE</span>
+      </div>
+      <div class="kpi-count">${count}</div>
+      <div class="kpi-label">${cfg.label}</div>
+      <div class="kpi-amount">${fmtMoney(total)}</div>`;
+    grid.appendChild(card);
+  });
+}
+
+// ── Build Summary Bar ─────────────────────────────────────────────────────────
+function updateSummaryBar() {
+  const el = document.getElementById("summary-bar");
+  const keys = activeStatuses.size ? [...activeStatuses] : Object.keys(STATUS_CONFIG);
+  let totalCount=0, totalAmt=0, zeroCount=0;
+  keys.forEach(k => {
+    const filtered = getFiltered(k);
+    totalCount += filtered.length;
+    totalAmt   += filtered.reduce((s,r)=>s+amt(r.amount),0);
+    zeroCount  += filtered.filter(isZero).length;
+  });
+  el.innerHTML = `
+    <div class="summary-stat"><div class="summary-stat-val">${totalCount}</div><div class="summary-stat-lbl">Visible POs</div></div>
+    <div class="summary-divider"></div>
+    <div class="summary-stat"><div class="summary-stat-val">${fmtMoney(totalAmt)||"$0.00"}</div><div class="summary-stat-lbl">Total Exposure</div></div>
+    <div class="summary-divider"></div>
+    <div class="summary-stat"><div class="summary-stat-val">${zeroCount}</div><div class="summary-stat-lbl">Zero / Blank Amount</div></div>
+    <div class="summary-divider"></div>
+    <div class="summary-stat"><div class="summary-stat-val">${totalCount - zeroCount}</div><div class="summary-stat-lbl">With Amount</div></div>`;
+}
+
+// ── Build Sections ────────────────────────────────────────────────────────────
+function buildSections() {
+  const container = document.getElementById("sections");
+  Object.entries(STATUS_CONFIG).forEach(([key, cfg]) => {
+    const sec = document.createElement("div");
+    sec.className = "section visible"; sec.id = "sec-"+key; sec.dataset.key = key;
+    sec.innerHTML = `
+      <div class="section-head" onclick="toggleSection('${key}')">
+        <div class="section-head-left">
+          <span style="font-size:16px">${cfg.icon}</span>
+          <span class="section-label">${cfg.label}</span>
+          <span class="section-badge" id="badge-${key}"></span>
+          <span class="section-total" id="stotal-${key}"></span>
+        </div>
+        <span class="section-chevron" id="chv-${key}">▼</span>
+      </div>
+      <div class="table-wrap" id="twrap-${key}">
+        <table>
+          <thead id="thead-${key}"></thead>
+          <tbody id="tbody-${key}"></tbody>
+          <tfoot id="tfoot-${key}"></tfoot>
+        </table>
+      </div>`;
+    container.appendChild(sec);
+    buildTableHeader(key, cfg);
+  });
+}
+
+function buildTableHeader(key, cfg) {
+  const thead = document.getElementById("thead-"+key);
+  const cols = [
+    {id:"po",           label:"PO Number",       cls:""},
+    {id:"date",         label:"PO Date",         cls:""},
+    {id:"dueDate",      label:"Due / Receive By", cls:""},
+    {id:"amount",       label:"Amount",          cls:"right"},
+    {id:"trackingInfo", label:"Tracking Info",   cls:""},
+  ];
+  const tr = document.createElement("tr");
+  cols.forEach(c => {
+    const th = document.createElement("th");
+    th.className = c.cls; th.dataset.col = c.id; th.dataset.key = key;
+    th.textContent = c.label;
+    th.onclick = () => sortBy(key, c.id);
+    tr.appendChild(th);
+  });
+  thead.appendChild(tr);
+}
+
+// ── Render Table Rows ─────────────────────────────────────────────────────────
+function renderRows(key) {
+  const rows = getFiltered(key);
+  const tbody = document.getElementById("tbody-"+key);
+  const tfoot = document.getElementById("tfoot-"+key);
+  tbody.innerHTML = "";
+  tfoot.innerHTML = "";
+
+  // Update badge + total
+  const total = rows.reduce((s,r)=>s+amt(r.amount),0);
+  document.getElementById("badge-"+key).textContent = `${rows.length} / ${DATA[key].length}`;
+  document.getElementById("stotal-"+key).textContent = fmtMoney(total) || "$0.00";
+
+  if (!rows.length) {
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="5">No results match current filters</td></tr>`;
+    return;
+  }
+
+  rows.forEach(r => {
+    const a = amt(r.amount);
+    const link = r.id ? NS(r.id) : "#";
+    const dueClass = isOverdue(r.dueDate) ? "overdue" : (r.dueDate ? "" : "empty");
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td class="td-po"><a href="${link}" target="_blank" rel="noopener">${r.po}</a></td>
+      <td class="td-date">${r.date}</td>
+      <td class="td-due ${dueClass}">${r.dueDate || "—"}</td>
+      <td class="td-amount ${a ? "nonzero" : "zero"}">${fmtMoney(a) || "—"}</td>
+      <td class="td-tracking" title="${(r.trackingInfo||"").replace(/"/g,"&quot;")}">${r.trackingInfo || "—"}</td>`;
+    tbody.appendChild(tr);
+  });
+
+  // Footer total row
+  const footTr = document.createElement("tr");
+  footTr.className = "tfoot-row";
+  footTr.innerHTML = `
+    <td colspan="3" style="padding-left:16px;letter-spacing:.06em;font-size:10px">SUBTOTAL — ${rows.length} PO${rows.length!==1?"s":""}</td>
+    <td class="td-amount tfoot-total" style="text-align:right">${fmtMoney(total)||"—"}</td>
+    <td></td>`;
+  tfoot.appendChild(footTr);
+
+  // Update sort indicators
+  const s = sortState[key];
+  document.querySelectorAll(`#thead-${key} th`).forEach(th => {
+    th.classList.remove("sorted-asc","sorted-desc");
+    if (s && th.dataset.col === s.col) th.classList.add(s.dir==="asc"?"sorted-asc":"sorted-desc");
+  });
+}
+
+// ── Sort ──────────────────────────────────────────────────────────────────────
+function sortBy(key, col) {
+  const cur = sortState[key];
+  if (cur && cur.col === col) {
+    sortState[key] = { col, dir: cur.dir==="asc" ? "desc" : "asc" };
+  } else {
+    sortState[key] = { col, dir: "asc" };
+  }
+  renderRows(key);
+}
+
+// ── Section Toggle ────────────────────────────────────────────────────────────
+function toggleSection(key) {
+  const wrap = document.getElementById("twrap-"+key);
+  const chv  = document.getElementById("chv-"+key);
+  wrap.classList.toggle("hidden");
+  chv.classList.toggle("closed");
+}
+
+// ── Status Filter ─────────────────────────────────────────────────────────────
+function toggleStatus(key) {
+  activeStatuses.has(key) ? activeStatuses.delete(key) : activeStatuses.add(key);
+  document.getElementById("kpi-"+key).classList.toggle("active", activeStatuses.has(key));
+  applyFilters();
+}
+
+// ── Zero Toggle ───────────────────────────────────────────────────────────────
+function toggleZero() {
+  zeroOnly = !zeroOnly;
+  const btn = document.getElementById("btn-zero");
+  btn.classList.toggle("active", zeroOnly);
+  document.getElementById("btn-zero-label").textContent = zeroOnly ? "Zero Only ✓" : "Zero Amounts";
+  applyFilters();
+}
+
+// ── Clear All ─────────────────────────────────────────────────────────────────
+function clearAll() {
+  activeStatuses.clear();
+  zeroOnly = false;
+  document.getElementById("search").value = "";
+  document.getElementById("btn-zero").classList.remove("active");
+  document.getElementById("btn-zero-label").textContent = "Zero Amounts";
+  document.querySelectorAll(".kpi-card").forEach(c => c.classList.remove("active"));
+  applyFilters();
+}
+
+// ── Main Apply ────────────────────────────────────────────────────────────────
+function applyFilters() {
+  const q = document.getElementById("search").value.trim();
+  const hasStatus = activeStatuses.size > 0;
+
+  Object.keys(STATUS_CONFIG).forEach(key => {
+    const sec = document.getElementById("sec-"+key);
+    if (hasStatus && !activeStatuses.has(key)) { sec.classList.remove("visible"); return; }
+    sec.classList.add("visible");
+    renderRows(key);
+  });
+
+  updateSummaryBar();
+
+  // Filter info pill
+  const parts = [];
+  if (activeStatuses.size) parts.push([...activeStatuses].map(k=>STATUS_CONFIG[k].label).join(", "));
+  if (zeroOnly) parts.push("Zero / blank amount");
+  if (q) parts.push(`"${q}"`);
+  const info = document.getElementById("filter-info");
+  document.getElementById("filter-info-text").textContent = parts.length ? "Filters: " + parts.join(" · ") : "";
+  info.style.display = parts.length ? "flex" : "none";
+  info.className = "filter-pill active-filter";
+
+  document.getElementById("btn-clear").style.display = (hasStatus||zeroOnly||q) ? "inline-flex" : "none";
+
+  // Footer timestamp
+  document.getElementById("page-footer").textContent =
+    `CTS Mobility · PO Open Billing Status · Data: May 27, 2026 · Saved Search #5528 · ${Object.values(DATA).flat().length} total POs`;
+}
+
+// ── Excel Export ──────────────────────────────────────────────────────────────
+function exportExcel() {
+  const wb = XLSX.utils.book_new();
+  const HDRS = ["PO Number","PO Date","Due / Receive By","Amount ($)","Billing Status","Tracking Info"];
+  const keys = activeStatuses.size ? [...activeStatuses] : Object.keys(STATUS_CONFIG);
+
+  // Summary sheet
+  let grandCount=0, grandAmt=0;
+  const sumRows = [["CTS Mobility — PO Open Billing Status"],
+    [`Exported ${new Date().toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}`],[],["Status","PO Count","Total Amount ($)"]];
+  keys.forEach(k => {
+    const f = getFiltered(k); const t = f.reduce((s,r)=>s+amt(r.amount),0);
+    grandCount+=f.length; grandAmt+=t;
+    sumRows.push([STATUS_CONFIG[k].label, f.length, t]);
+  });
+  sumRows.push(["GRAND TOTAL", grandCount, grandAmt]);
+  const ws0 = XLSX.utils.aoa_to_sheet(sumRows);
+  ws0["!cols"] = [{wch:42},{wch:12},{wch:18}];
+  XLSX.utils.book_append_sheet(wb, ws0, "Summary");
+
+  // Per-status sheets
+  keys.forEach(k => {
+    const rows = [HDRS, ...getFiltered(k).map(r=>[r.po,r.date,r.dueDate||"",amt(r.amount)||"",STATUS_CONFIG[k].label,r.trackingInfo||""])];
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws["!cols"] = [{wch:16},{wch:12},{wch:14},{wch:16},{wch:34},{wch:55}];
+    ws["!autofilter"] = { ref:`A1:F${rows.length}` };
+    XLSX.utils.book_append_sheet(wb, ws, STATUS_CONFIG[k].label.replace(/\//g,"-").substring(0,31));
+  });
+
+  // All POs sheet
+  const allRows = [HDRS, ...keys.flatMap(k=>getFiltered(k).map(r=>[r.po,r.date,r.dueDate||"",amt(r.amount)||"",STATUS_CONFIG[k].label,r.trackingInfo||""]))];
+  const wsAll = XLSX.utils.aoa_to_sheet(allRows);
+  wsAll["!cols"] = [{wch:16},{wch:12},{wch:14},{wch:16},{wch:34},{wch:55}];
+  wsAll["!autofilter"] = { ref:`A1:F${allRows.length}` };
+  XLSX.utils.book_append_sheet(wb, wsAll, "All POs");
+
+  const suffix = (activeStatuses.size||zeroOnly||document.getElementById("search").value.trim()) ? "_filtered" : "";
+  XLSX.writeFile(wb, `CTS_PO_Open_Billing${suffix}_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+(function init() {
+  const zeroCount = Object.values(DATA).flat().filter(isZero).length;
+  document.getElementById("btn-zero-count").textContent = zeroCount;
+  buildKPI();
+  buildSections();
+  applyFilters();
+})();
+</script>
+</body>
+</html>
